@@ -8,7 +8,7 @@ Auto ping bot for [bless-network](https://bless.network/dashboard?ref=8SV9Y7), w
 
 [https://bless.network](https://bless.network/dashboard?ref=8SV9Y7)
 
-[手把手中文使用教程]() | [TG Channel](https://t.me/+ntyApQYvrBowZTc1)
+[手把手中文使用教程](https://mirror.xyz/dashboard/edit/CGbC6KzZzJk2ANpLKvxTw-QXVPduobHl9YBP3f0-wr8) | [TG Channel](https://t.me/+ntyApQYvrBowZTc1)
 
 ## Features
 
@@ -54,6 +54,10 @@ You can buy proxies from [ProxyCheap](https://app.proxy-cheap.com/r/ksvW8Z) or a
 
 > [!WARNING]
 > Dont update the config files manually, always use the config generator page to update the config files.
+
+#### Multiple accounts support
+
+if you have multiple accounts, you can generate the config files for each account and merge them into one `nodes.txt` file.
 
 ### Running the Bot with Docker (Recommended)
 
