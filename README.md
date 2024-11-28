@@ -47,7 +47,7 @@ You can buy proxies from [ProxyCheap](https://app.proxy-cheap.com/r/ksvW8Z) or a
 
 ### Create config files
 
-1. Open the config generator page: <http://web3bot.overtrue.me/bless-network-bot/config-generator.html>
+1. Open the config generator page: <https://web3bothub.github.io/bless-network-bot/nodes-generator.html>
 1. Paste your user ID and input your proxies.
 1. Click the "Generate" button.
 1. Download the generated config files.
