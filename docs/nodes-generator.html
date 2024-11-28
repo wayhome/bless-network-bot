@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bless Network Config Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-4xl w-full bg-white shadow-lg rounded-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4 text-center">
+            Bless Network Config Generator
+        </h1>
+        <div class="text-center text-gray-600 mb-6">
+            <p>
+                Created by
+                <a href="https://github.com/overtrue" target="_blank" class="text-blue-600 hover:underline">
+                    overtrue
+                </a>
+            </p>
+            <p>
+                Repository:
+                <a href="https://github.com/web3bothub/bless-network-bot" target="_blank" class="text-blue-600 hover:underline">
+                    Bless Network Bot
+                </a>
+            </p>
+        </div>
+        <form onsubmit="event.preventDefault(); generateConfig();" class="space-y-6">
+            <div>
+                <label for="userToken" class="block text-gray-700 font-semibold mb-2">User Token:</label>
+                <input type="text" id="userToken" name="userToken" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="eyJhbGci..." required />
+            </div>
+            <div>
+                <label for="proxies" class="block text-gray-700 font-semibold mb-2">Proxies (one per line):</label>
+                <textarea id="proxies" name="proxies" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="http://user:pass@ip:port" required></textarea>
+                <p class="text-sm text-gray-600 mt-2">
+                    Example: http://user:pass@ip:port or socks5://user:pass@ip:port
+                </p>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition">
+                Generate Config
+            </button>
+        </form>
+
+        <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4">
+            Generated Configuration
+        </h2>
+        <textarea id="result" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-mono h-48"
+            placeholder="Generated configuration will appear here"></textarea>
+
+        <div class="flex justify-end space-x-4 mt-4">
+            <button onclick="copyToClipboard()" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 transition">
+                Copy to Clipboard
+            </button>
+            <button onclick="downloadConfig()" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition">
+                Download Config
+            </button>
+        </div>
+
+        <div class="text-left text-gray-600 mt-6 border border-orange-500 text-orange-800 p-4 rounded bg-orange-100">
+            <p>
+                <strong>Note:</strong>
+            <ul class="list-disc pl-4">
+                <li>Do not edit the generated configuration. It is already formatted, and any changes may cause issues.</li>
+                <li>if you need to make changes, generate a new configuration.</li>
+                <li>if you have multiple accounts, generate a configuration for each account and merge all of them into a single file `nodes.txt`.</li>
+            </ul>
+            </p>
+        </div>
+
+        <script>
+            async function generateConfig() {
+                const userToken = document.getElementById("userToken").value.trim()
+                const proxies = document
+                    .getElementById("proxies")
+                    .value.trim()
+                    .split("\n")
+                    .filter((line) => line.trim())
+                const resultBox = document.getElementById("result")
+
+                if (!userToken || proxies.length === 0) {
+                    alert("Please provide a user token and at least one proxy.")
+                    return
+                }
+
+                const nodesConfig = []
+                for (const proxy of proxies) {
+                    const nodeId = generatePubKey()
+                    const hardwareIdentifier = getHardwareIdentifierFromNodeId(nodeId)
+                    const deviceIdentifier = await generateDeviceIdentifier(hardwareIdentifier)
+                    nodesConfig.push(`${userToken}|${nodeId}:${deviceIdentifier}|${proxy}`)
+                }
+
+                const resultText = nodesConfig.join("\n")
+                resultBox.value = resultText
+            }
+
+            function copyToClipboard() {
+                const resultBox = document.getElementById("result")
+                resultBox.select()
+                document.execCommand("copy")
+                alert("Configuration copied to clipboard!")
+            }
+
+            function downloadConfig() {
+                const resultBox = document.getElementById("result")
+                if (!resultBox.value.trim()) {
+                    alert("No configuration to download. Please generate it first.")
+                    return
+                }
+
+                const blob = new Blob([resultBox.value], { type: "text/plain" })
+                const link = document.createElement("a")
+                link.href = URL.createObjectURL(blob)
+                link.download = "nodes.txt"
+                link.click()
+            }
+
+            function generatePubKey(length = 52) {
+                const prefix = "12D3KooW"
+                const remainingLength = length - prefix.length
+                const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+                let remainingChars = ""
+                for (let i = 0; i < remainingLength; i++) {
+                    const randomIndex = Math.floor(Math.random() * characters.length)
+                    remainingChars += characters[randomIndex]
+                }
+                return prefix + remainingChars
+            }
+
+            function getHardwareIdentifierFromNodeId(nodeId) {
+                const cpuInfo = {
+                    cpuArchitecture: "x64",
+                    cpuModel: `Intel(R) Core(TM) i7-7700HQ CPU @ 2.80GHz`,
+                    numOfProcessors: 8,
+                    totalMemory: 32 * 1024 * 1024 * 1024, // 8 GB
+                }
+                return btoa(JSON.stringify(cpuInfo))
+            }
+
+            async function generateDeviceIdentifier(hardwareIdentifier) {
+                const deviceInfo = JSON.stringify({ hardware: hardwareIdentifier })
+                const encodedDeviceInfo = new TextEncoder().encode(deviceInfo)
+                const hashBuffer = await crypto.subtle.digest('SHA-256', encodedDeviceInfo)
+                return Array.from(new Uint8Array(hashBuffer))
+                    .map(byte => byte.toString(16).padStart(2, '0'))
+                    .join('')
+            }
+        </script>
+</body>
+
+</html>
