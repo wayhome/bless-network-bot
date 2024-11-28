@@ -8,7 +8,7 @@ Auto ping bot for [bless-network](https://bless.network/dashboard?ref=8SV9Y7), w
 
 [https://bless.network](https://bless.network/dashboard?ref=8SV9Y7)
 
-[手把手中文使用教程]() | TG Channel: <https://t.me/+ntyApQYvrBowZTc1>
+[手把手中文使用教程]() | [TG Channel](https://t.me/+ntyApQYvrBowZTc1)
 
 ## Features
 
