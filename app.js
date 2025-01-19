@@ -1,11 +1,11 @@
 import axios from 'axios'
-import { promises as fs } from 'fs'
+import * as fs from 'node:fs'
 import winston from 'winston'
-import { extractUserIdFromJwtToken, getIpAddressFromProxyUrl, getProxyAgent, getRandomUserAgent, sleep } from './utils.js'
+import { extractUserIdFromJwtToken, generateRandomHardwareInfo, getIpAddressFromProxyUrl, getProxyAgent, sleep } from './utils.js'
 
 // Global constants
 const BASE_URI = 'https://gateway-run.bls.dev/api/v1'
-const PING_INTERVAL = 60000
+const PING_INTERVAL = 120000
 
 // Logger configuration function to add an account prefix
 function createLogger(accountIdentifier) {
@@ -39,13 +39,25 @@ class AccountSession {
     this.token = token
     this.nodeId = nodeId
     this.proxy = proxy
+    this.extensionVersion = '0.1.7'
     this.ipAddress = getIpAddressFromProxyUrl(proxy)
     this.hardwareId = hardwareId
     this.retries = 0
     this.lastPingTime = 0
-    this.userAgent = getRandomUserAgent()
     const shortNodeId = nodeId.substring(0, 9) + '...' + nodeId.substring(nodeId.length - 4)
     this.logger = createLogger(`nodeId:${shortNodeId}@${this.ipAddress || 'no-proxy'}`)
+  }
+
+  async getHardwareInfo() {
+    const filePath = `hardwares/${this.nodeId}.json`
+
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    }
+
+    const hardwareInfo = generateRandomHardwareInfo()
+    fs.writeFileSync(filePath, JSON.stringify(hardwareInfo, null, 2))
+    return hardwareInfo
   }
 
   async start() {
@@ -70,37 +82,65 @@ class AccountSession {
       return
     }
 
+    const hardwareInfo = await this.getHardwareInfo()
+
     const response = await this.performRequest('post', `${BASE_URI}/nodes/${this.nodeId}`, {
       ipAddress: this.ipAddress,
-      hardwareId: this.hardwareId
+      hardwareId: this.hardwareId,
+      hardwareInfo: hardwareInfo,
+      extensionVersion: this.extensionVersion
     })
 
     this.logger.info(`Register node response: ${JSON.stringify(response?.data)}`)
   }
 
   async getNode() {
-    const response = await this.performRequest('get', `${BASE_URI}/nodes/${this.nodeId}`, {
-      ipAddress: this.ipAddress,
-      hardwareId: this.hardwareId
-    })
+    const response = await this.performRequest('get', `${BASE_URI}/nodes/${this.nodeId}`)
 
     this.logger.info(`Register node response: ${JSON.stringify(response?.data)}`)
   }
 
-  async startSession() {
-    const response = await this.performRequest('post', `${BASE_URI}/nodes/${this.nodeId}/start-session`)
+  async checkHealth() {
+    try {
+      const response = await this.performRequest('get', `https://gateway-run.bls.dev/health`)
+      const data = await response.json()
 
-    this.logger.info(`Start session response: ${JSON.stringify(response?.data)}`)
+      if (!data || data.status !== 'ok') {
+        this.logger.error(`Check health failed for proxy ${this.ipAddress}`)
+        return
+      }
+
+      this.logger.info(`Check health response: ${JSON.stringify(response?.data)}`)
+    } catch (error) {
+      this.logger.error(`Check health failed: ${error.message}`)
+    }
+  }
+
+  async startSession() {
+    try {
+      const response = await this.performRequest('post', `${BASE_URI}/nodes/${this.nodeId}/start-session`)
+
+      if (!response) {
+        this.logger.error(`Start session failed for proxy ${this.ipAddress}`)
+        return
+      }
+
+      this.logger.info(`Start session response: ${JSON.stringify(response?.data)}`)
+    } catch (error) {
+      this.logger.error(`Start session failed for proxy ${this.ipAddress}: ${error.message}`)
+    }
   }
 
   async performRequest(method, url, data, maxRetries = 3) {
     const headers = {
-      Authorization: `Bearer ${this.token}`,
-      'User-Agent': this.userAgent,
+      'Authorization': `Bearer ${this.token}`,
       'Accept': 'application/json',
       'Accept-Encoding': 'gzip, deflate, br',
       'Content-Type': 'application/json',
       'Origin': 'chrome-extension://pljbjcehnhcnofmkdbjolghdcjnmekia',
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5"
     }
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -192,6 +232,11 @@ class AccountSession {
     }
   }
 
+  async stopPing() {
+    this.logger.info('Stopping ping loop')
+    clearInterval(this.pingInterval)
+  }
+
   handlePingFail(proxy, response) {
     this.retries++
     if (response?.code === 403) {
@@ -210,7 +255,7 @@ class AccountSession {
 async function loadNodes() {
   try {
     // 结构： userToken|nodeId:hardwareId|proxy
-    const lines = await fs.readFile('nodes.txt', 'utf-8')
+    const lines = fs.readFileSync('nodes.txt', 'utf-8')
     // 移除空行和空格，引号
     return lines.split('\n').filter(Boolean).map(token => token.trim().replace(/['"]+/g, '')).map(token => {
       const [userToken, nodeIdHardwareId, proxy] = token.split('|')
